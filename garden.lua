@@ -1,6 +1,6 @@
 --[[
-    @author depso (depthso) - fixed by Claude
-    @description Grow a Garden auto-farm script (improved auto-buy functionality)
+    @author depso (depthso) - fixed by ChatGPT
+    @description Grow a Garden auto-farm script (fixed & debugged)
     https://www.roblox.com/games/126884695634066
 ]]
 
@@ -60,7 +60,7 @@ local HarvestIgnores = {
 }
 
 --// Globals (toggles will be initialized after UI creation)
-local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThreshold, NoClip, AutoWalkAllowRandom, AutoSell, AutoWalk, AutoWalkMaxWait, AutoWalkStatus, SelectedSeedStock, BuyAmount, AutoBuyDelay, OnlyShowStock
+local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThreshold, NoClip, AutoWalkAllowRandom, AutoSell, AutoWalk, AutoWalkMaxWait, AutoWalkStatus, SelectedSeedStock
 
 -- Helper function to wait for character and return it
 local function WaitForCharacter()
@@ -138,60 +138,20 @@ local function BuySeed(seed)
     GameEvents:WaitForChild("BuySeedStock"):FireServer(seed)
 end
 
--- Improved BuyAllSelectedSeeds function
 local function BuyAllSelectedSeeds()
     local seed = SelectedSeedStock and SelectedSeedStock.Selected
     if not seed or seed == "" then
         print("[BuyAllSelectedSeeds] No seed selected.")
         return
     end
-    
-    -- Refresh stock before buying
-    GetSeedStock()
     local stock = SeedStock[seed]
     if not stock or stock <= 0 then
         print("[BuyAllSelectedSeeds] No stock available for", seed)
         return
     end
-    
-    local amount = BuyAmount and BuyAmount.Value or stock
-    local buyCount = math.min(amount, stock) -- Don't try to buy more than available
-    local delay = (AutoBuyDelay and AutoBuyDelay.Value or 500) / 1000 -- Convert ms to seconds
-    
-    print(string.format("[BuyAllSelectedSeeds] Buying %d of %s (Stock: %d)", buyCount, seed, stock))
-    
-    for i = 1, buyCount do
+    for i = 1, stock do
         BuySeed(seed)
-        if i < buyCount then -- Don't wait after the last purchase
-            wait(delay)
-        end
-    end
-    
-    print(string.format("[BuyAllSelectedSeeds] Finished buying %d seeds", buyCount))
-end
-
--- Auto-buy loop function
-local function AutoBuyLoop()
-    if not AutoBuy or not AutoBuy.Value then return end
-    
-    local seed = SelectedSeedStock and SelectedSeedStock.Selected
-    if not seed or seed == "" then return end
-    
-    -- Check if we need seeds (optional: only buy if we have less than a certain amount)
-    GetOwnedSeeds()
-    local ownedCount = OwnedSeeds[seed] and OwnedSeeds[seed].Count or 0
-    
-    -- Only buy if we have less than 10 seeds (configurable threshold)
-    if ownedCount < 10 then
-        GetSeedStock()
-        local stock = SeedStock[seed]
-        if stock and stock > 0 then
-            local buyCount = math.min(BuyAmount and BuyAmount.Value or 1, stock)
-            for i = 1, buyCount do
-                BuySeed(seed)
-                wait((AutoBuyDelay and AutoBuyDelay.Value or 500) / 1000)
-            end
-        end
+        wait(0.2) -- avoid spamming server
     end
 end
 
@@ -242,7 +202,6 @@ local function AutoPlantLoop()
         return
     end
 
-    GetOwnedSeeds() -- Refresh owned seeds
     local seedData = OwnedSeeds[seed]
     if not seedData then
         print("[AutoPlantLoop] Seed not owned:", seed)
@@ -469,7 +428,7 @@ end
 local Window = ReGui:Window({
     Title = string.format("%s | Depso", GameInfo.Name),
     Theme = "GardenTheme",
-    Size = UDim2.fromOffset(350, 250)
+    Size = UDim2.fromOffset(300, 200)
 })
 
 -- Auto-Plant
@@ -477,7 +436,7 @@ local PlantNode = Window:TreeNode({ Title = "Auto-Plant 🥕" })
 SelectedSeed = PlantNode:Combo({
     Label = "Seed",
     Selected = "",
-    GetItems = function() GetOwnedSeeds(); local items = {}; for k,v in pairs(OwnedSeeds) do items[k] = v.Count end; return items end,
+    GetItems = GetSeedStock,
 })
 AutoPlant = PlantNode:Checkbox({ Value = true, Label = "Enabled" })
 AutoPlantRandom = PlantNode:Checkbox({ Value = false, Label = "Plant at random points" })
@@ -495,7 +454,7 @@ for k, v in pairs(HarvestIgnores) do
     })
 end
 
--- Auto-Buy (Improved)
+-- Auto-Buy
 local BuyNode = Window:TreeNode({ Title = "Auto-Buy 🥕" })
 SelectedSeedStock = BuyNode:Combo({
     Label = "Seed",
@@ -506,40 +465,9 @@ SelectedSeedStock = BuyNode:Combo({
     end,
 })
 
-AutoBuy = BuyNode:Checkbox({ Value = false, Label = "Auto-buy enabled" })
-OnlyShowStock = BuyNode:Checkbox({ Value = true, Label = "Only show seeds with stock" })
-
--- New controls for better buying
-BuyAmount = BuyNode:SliderInt({
-    Label = "Buy amount",
-    Value = 10,
-    Minimum = 1,
-    Maximum = 100,
-})
-
-AutoBuyDelay = BuyNode:SliderInt({
-    Label = "Buy delay (ms)",
-    Value = 500,
-    Minimum = 100,
-    Maximum = 2000,
-})
-
-BuyNode:Button({ Text = "Buy selected amount", Callback = BuyAllSelectedSeeds })
-BuyNode:Button({ 
-    Text = "Buy ALL stock", 
-    Callback = function()
-        local seed = SelectedSeedStock and SelectedSeedStock.Selected
-        if not seed or seed == "" then return end
-        GetSeedStock()
-        local stock = SeedStock[seed] or 0
-        if stock > 0 then
-            local oldValue = BuyAmount.Value
-            BuyAmount.Value = stock
-            BuyAllSelectedSeeds()
-            BuyAmount.Value = oldValue
-        end
-    end 
-})
+AutoBuy = BuyNode:Checkbox({ Value = true, Label = "Enabled" })
+local OnlyShowStock = BuyNode:Checkbox({ Value = false, Label = "Only list stock" })
+BuyNode:Button({ Text = "Buy all", Callback = BuyAllSelectedSeeds })
 
 -- Auto-Sell
 local SellNode = Window:TreeNode({ Title = "Auto-Sell 💰" })
@@ -577,18 +505,9 @@ MakeLoop(AutoWalk, function()
 end)
 
 MakeLoop(AutoHarvest, HarvestPlants)
-MakeLoop(AutoBuy, AutoBuyLoop) -- Now uses the improved auto-buy loop
+MakeLoop(AutoBuy, BuyAllSelectedSeeds)
 MakeLoop(AutoPlant, AutoPlantLoop)
 
-print("[Script] Auto-farm script loaded and running with improved auto-buy functionality.")
+print("[Script] Auto-farm script loaded and running.")
 
---[[ 
-IMPROVEMENTS MADE TO AUTO-BUY:
-1. Added BuyAmount slider to control how many seeds to buy
-2. Added AutoBuyDelay slider to control delay between purchases
-3. Improved BuyAllSelectedSeeds() function with better error handling
-4. Added "Buy ALL stock" button to buy entire available stock
-5. Auto-buy now only triggers when you have less than 10 seeds
-6. Better stock checking and validation
-7. Improved UI layout and controls
-]]
+--[[ THIS WORK ONLY AUTO BUY ]]
