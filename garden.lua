@@ -1,6 +1,6 @@
 --[[
     @author depso (depthso) - fixed by ChatGPT
-    @description Grow a Garden auto-farm script (updated and debugged)
+    @description Grow a Garden auto-farm script (fixed & debugged)
     https://www.roblox.com/games/126884695634066
 ]]
 
@@ -106,22 +106,17 @@ end
 
 local function Plant(position, seed)
     print("[Plant] Planting seed:", seed, "at", position)
-    if not GameEvents:FindFirstChild("Plant_RE") then
-        warn("[Plant] 'Plant_RE' RemoteEvent not found!")
-        return
-    end
-    GameEvents.Plant_RE:FireServer(position, seed)
+    GameEvents:WaitForChild("Plant_RE"):FireServer(position, seed)
     wait(0.3)
 end
 
-local SellInventoryRunning = false
 local function SellInventory()
     local character = LocalPlayer.Character or WaitForCharacter()
     local previousCFrame = character:GetPivot()
     local previousSheckles = ShecklesCount.Value
 
-    if SellInventoryRunning then return end
-    SellInventoryRunning = true
+    if SellInventory.IsRunning then return end
+    SellInventory.IsRunning = true
 
     print("[SellInventory] Moving to sell position...")
     character:PivotTo(CFrame.new(62, 4, -26))
@@ -131,24 +126,16 @@ local function SellInventory()
             print("[SellInventory] Sell complete.")
             break
         end
-        if not GameEvents:FindFirstChild("Sell_Inventory") then
-            warn("[SellInventory] 'Sell_Inventory' RemoteEvent not found!")
-            break
-        end
-        GameEvents.Sell_Inventory:FireServer()
+        GameEvents:WaitForChild("Sell_Inventory"):FireServer()
     end
 
     character:PivotTo(previousCFrame)
-    SellInventoryRunning = false
+    SellInventory.IsRunning = false
 end
 
 local function BuySeed(seed)
-    if not GameEvents:FindFirstChild("BuySeedStock") then
-        warn("[BuySeed] 'BuySeedStock' RemoteEvent not found!")
-        return
-    end
     print("[BuySeed] Buying seed:", seed)
-    GameEvents.BuySeedStock:FireServer(seed)
+    GameEvents:WaitForChild("BuySeedStock"):FireServer(seed)
 end
 
 local function BuyAllSelectedSeeds()
@@ -322,7 +309,7 @@ local function AutoSellCheck()
 end
 
 local function AutoWalkLoop()
-    if SellInventoryRunning then return end
+    if SellInventory.IsRunning then return end
 
     local character = LocalPlayer.Character or WaitForCharacter()
     local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -523,3 +510,4 @@ MakeLoop(AutoPlant, AutoPlantLoop)
 
 print("[Script] Auto-farm script loaded and running.")
 
+--[[ THIS WORK ONLY AUTO BUY ]]
