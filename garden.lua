@@ -1,6 +1,6 @@
 --[[
-    @author depso (depthso) - fixed by ChatGPT
-    @description Grow a Garden auto-farm script (fixed & debugged)
+    @author depso (depthso) - fixed & improved by ChatGPT
+    @description Grow a Garden auto-farm script with improved Auto-Buy + search
     https://www.roblox.com/games/126884695634066
 ]]
 
@@ -136,23 +136,6 @@ end
 local function BuySeed(seed)
     print("[BuySeed] Buying seed:", seed)
     GameEvents:WaitForChild("BuySeedStock"):FireServer(seed)
-end
-
-local function BuyAllSelectedSeeds()
-    local seed = SelectedSeedStock and SelectedSeedStock.Selected
-    if not seed or seed == "" then
-        print("[BuyAllSelectedSeeds] No seed selected.")
-        return
-    end
-    local stock = SeedStock[seed]
-    if not stock or stock <= 0 then
-        print("[BuyAllSelectedSeeds] No stock available for", seed)
-        return
-    end
-    for i = 1, stock do
-        BuySeed(seed)
-        wait(0.2) -- avoid spamming server
-    end
 end
 
 local function GetSeedInfo(tool)
@@ -454,20 +437,82 @@ for k, v in pairs(HarvestIgnores) do
     })
 end
 
--- Auto-Buy
+-- ==== Auto-Buy (Improved) ====
 local BuyNode = Window:TreeNode({ Title = "Auto-Buy 🥕" })
-SelectedSeedStock = BuyNode:Combo({
-    Label = "Seed",
-    Selected = "",
-    GetItems = function()
-        local onlyStock = OnlyShowStock and OnlyShowStock.Value
-        return GetSeedStock(onlyStock)
+
+-- Search filter variable
+local searchText = ""
+
+-- Function to get filtered seed stock based on searchText
+local function GetFilteredSeedStock()
+    local allSeeds = GetSeedStock(true) -- get only seeds with stock > 0
+    if searchText == "" then return allSeeds end
+
+    local filtered = {}
+    for seedName, stockCount in pairs(allSeeds) do
+        if seedName:lower():find(searchText:lower()) then
+            filtered[seedName] = stockCount
+        end
+    end
+    return filtered
+end
+
+-- Search input box for filtering seeds
+local searchBox = BuyNode:Input({
+    Label = "Search seed",
+    Placeholder = "Type to search...",
+    Callback = function(val)
+        searchText = val or ""
+        -- Refresh dropdown items dynamically
+        SelectedSeedStock:SetItems(GetFilteredSeedStock())
+        -- Clear selection if it doesn't exist after filtering
+        if SelectedSeedStock.Selected ~= "" and not GetFilteredSeedStock()[SelectedSeedStock.Selected] then
+            SelectedSeedStock:SetSelected("")
+        end
     end,
 })
 
-AutoBuy = BuyNode:Checkbox({ Value = true, Label = "Enabled" })
+-- Dropdown Combo for seed selection (filtered)
+SelectedSeedStock = BuyNode:Combo({
+    Label = "Seed",
+    Selected = "",
+    GetItems = GetFilteredSeedStock,
+})
+
+-- Checkbox to only show seeds with stock
 local OnlyShowStock = BuyNode:Checkbox({ Value = false, Label = "Only list stock" })
-BuyNode:Button({ Text = "Buy all", Callback = BuyAllSelectedSeeds })
+
+AutoBuy = BuyNode:Checkbox({ Value = true, Label = "Enabled" })
+
+-- Improved BuyAllSelectedSeeds function
+local function BuyAllSelectedSeeds()
+    local seed = SelectedSeedStock and SelectedSeedStock.Selected
+    if not seed or seed == "" then
+        print("[BuyAllSelectedSeeds] No seed selected.")
+        return
+    end
+
+    -- Refresh stock before buying
+    SeedStock = GetSeedStock(true)
+    local stock = SeedStock[seed]
+
+    if not stock or stock <= 0 then
+        print("[BuyAllSelectedSeeds] No stock available for", seed)
+        return
+    end
+
+    print(string.format("[BuyAllSelectedSeeds] Buying %d of seed: %s", stock, seed))
+
+    for i = 1, stock do
+        GameEvents:WaitForChild("BuySeedStock"):FireServer(seed)
+        wait(0.3) -- delay between buys to avoid spam
+    end
+end
+
+BuyNode:Button({
+    Text = "Buy all",
+    Callback = BuyAllSelectedSeeds,
+})
 
 -- Auto-Sell
 local SellNode = Window:TreeNode({ Title = "Auto-Sell 💰" })
@@ -509,5 +554,3 @@ MakeLoop(AutoBuy, BuyAllSelectedSeeds)
 MakeLoop(AutoPlant, AutoPlantLoop)
 
 print("[Script] Auto-farm script loaded and running.")
-
---[[ THIS WORK ONLY AUTO BUY ]]
