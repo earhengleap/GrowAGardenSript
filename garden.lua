@@ -265,6 +265,34 @@ SelectedSeedStock = BuyNode:Combo({
 AutoBuy = BuyNode:Checkbox({ Value = true, Label = "Enabled" })
 BuyNode:Button({ Text = "Buy all", Callback = BuyAllSelectedSeeds })
 
+-- New function: Buy all seeds currently in stock
+local function BuyAllSeedsInStock()
+    local seedList = GetSeedStock(true) -- true = only seeds with stock > 0
+    for seedName, stock in pairs(seedList) do
+        if stock and stock > 0 then
+            for i = 1, stock do
+                BuySeed(seedName)
+                wait(0.2) -- small delay to prevent spam issues
+            end
+        end
+    end
+end
+
+-- Auto-Buy UI (Modified)
+local BuyNode = Window:TreeNode({ Title = "Auto-Buy 🥕" })
+OnlyShowStock = BuyNode:Checkbox({ Value = false, Label = "Only list stock" })
+SelectedSeedStock = BuyNode:Combo({
+    Label = "Seed",
+    Selected = "",
+    GetItems = function()
+        return GetSeedStock(OnlyShowStock and OnlyShowStock.Value)
+    end,
+})
+AutoBuy = BuyNode:Checkbox({ Value = true, Label = "Enabled" })
+BuyNode:Button({ Text = "Buy all of selected", Callback = BuyAllSelectedSeeds })
+BuyNode:Button({ Text = "Buy all seeds in stock", Callback = BuyAllSeedsInStock }) -- NEW BUTTON
+
+
 -- Auto-Sell
 local SellNode = Window:TreeNode({ Title = "Auto-Sell 💰" })
 SellNode:Button({ Text = "Sell inventory", Callback = SellInventory })
@@ -318,3 +346,5 @@ coroutine.wrap(function()
         end
     end
 end)()
+
+--[[ this one is working for the auto buy all in stock ]]
