@@ -1,11 +1,9 @@
 -- Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
 local LocalPlayer = Players.LocalPlayer
 
-local DataStream = ReplicatedStorage.GameEvents.DataStream -- RemoteEvent
+local DataStream = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("DataStream")
 
 -- UI Setup
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -74,12 +72,19 @@ local function UpdateStockUI(data)
 end
 
 DataStream.OnClientEvent:Connect(function(Type, Profile, Data)
+    -- DEBUG: Print all event data
+    print("DataStream event fired:")
+    print("Type:", Type)
+    print("Profile:", Profile)
+    print("Data contents:")
+    for i, v in ipairs(Data) do
+        print(i, v[1], v[2])
+    end
+
     if Type ~= "UpdateData" then return end
-    if not Profile:find(LocalPlayer.Name) then return end
+
+    -- TEMP: Remove Profile check to see all data for debugging
+    -- if not Profile:find(LocalPlayer.Name) then return end
 
     UpdateStockUI(Data)
 end)
-
--- Anti-AFK and Auto-Reconnect can remain unchanged from your original script,
--- but I'm leaving them out here to focus on the UI stock display.
-
