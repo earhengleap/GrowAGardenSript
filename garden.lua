@@ -510,5 +510,3 @@ MakeLoop(AutoPlant, AutoPlantLoop)
 
 print("[Script] Auto-farm script loaded and running.")
 
-
---[[ //This is working only AUTO BUY ]]
